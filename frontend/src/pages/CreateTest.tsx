@@ -5,6 +5,7 @@ import * as z from 'zod';
 import { Sparkles, Loader2, FileText, Download, Brain, Zap, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useExamStore } from '../store/examStore';
 
 // NCDPI Standards Data
 const standardsData: Record<string, Record<string, string[]>> = {
@@ -47,6 +48,7 @@ const testSchema = z.object({
 
 const CreateTest: React.FC = () => {
     const navigate = useNavigate();
+    const { selectedExam } = useExamStore();
     const [loading, setLoading] = useState(false);
     const [generatedTest, setGeneratedTest] = useState<any>(null);
     const [availableStandards, setAvailableStandards] = useState<string[]>([]);
@@ -83,6 +85,7 @@ const CreateTest: React.FC = () => {
                 ...data,
                 grade_level: parseInt(data.grade_level),
                 question_count: parseInt(data.question_count),
+                exam_standard: selectedExam || 'ncdpi'
             };
             const response = await api.post('/tests/generate', apiData);
             setGeneratedTest(response.data);
@@ -107,8 +110,9 @@ const CreateTest: React.FC = () => {
             {/* Header */}
             <div className="text-center space-y-2">
                 <h1 className="text-2xl sm:text-3xl font-bold">Create Assessment</h1>
-                <p className="text-slate-400 text-sm sm:text-base">Design your personalized EOG practice test</p>
+                <p className="text-slate-400 text-sm sm:text-base">Design your personalized practice assessment</p>
             </div>
+
 
             {/* Progress Steps */}
             <div className="flex items-center justify-center gap-3 sm:gap-6">

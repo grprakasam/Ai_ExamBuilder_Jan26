@@ -25,11 +25,11 @@ class FeedbackEngine:
             })
 
         prompt = f"""
-You are an expert NCDPI academic evaluator. 
-Analyze the student's performance on the following assessment questions.
+You are an expert academic evaluator for {questions[0].get('exam_standard', 'standardized')} assessments. 
+Analyze the student's performance on the following questions.
 For each question, provide:
 1. Score (0 to 1)
-2. Professional, constructive feedback 
+2. Professional, constructive, and growth-oriented feedback 
 3. A "hint" or "suggestion" for improvement if the answer is incorrect or partial.
 
 Input Data:
@@ -52,11 +52,12 @@ Format the output as a JSON object:
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "You are a North Carolina teacher providing feedback to students."},
+                {"role": "system", "content": "You are a professional educational evaluator providing constructive feedback to students."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
             temperature=0.3
         )
+
         
         return json.loads(response.choices[0].message.content)
