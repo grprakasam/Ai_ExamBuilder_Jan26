@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(test:*)",
+      "Bash(python -m pip:*)",
+      "Bash(python:*)",
+      "Bash(npm:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash($env:PYTHONDONTWRITEBYTECODE=1)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(set PYTHONDONTWRITEBYTECODE=1)",
+      "Bash(dir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 40px; }
+        .header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 30px; }
+        .question { margin-bottom: 20px; page-break-inside: avoid; }
+        .question-text { font-weight: bold; }
+        .options { margin-left: 20px; }
+        .option { margin: 5px 0; }
+        .answer-key { page-break-before: always; }
+        .footer { text-align: center; font-size: 0.8em; margin-top: 50px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>NC EOG Practice Assessment</h1>
+        <p><strong>Grade:</strong> {{ test.grade_level }} | <strong>Subject:</strong> {{ test.subject.value }}</p>
+        <p><strong>Topic:</strong> {{ test.standard_focus }}</p>
+    </div>
+
+    {% for q in questions %}
+    <div class="question">
+        <p class="question-text">{{ q.sequence }}. {{ q.question_text }}</p>
+        {% if q.options %}
+        <div class="options">
+            <div class="option">A. {{ q.options.A }}</div>
+            <div class="option">B. {{ q.options.B }}</div>
+            <div class="option">C. {{ q.options.C }}</div>
+            <div class="option">D. {{ q.options.D }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="answer-key">
+        <h2 style="text-align: center; border-bottom: 1px solid #000;">Answer Key</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; border-bottom: 1px solid #ddd;">#</th>
+                    <th style="text-align: left; border-bottom: 1px solid #ddd;">Answer</th>
+                    <th style="text-align: left; border-bottom: 1px solid #ddd;">Cognitive Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for q in questions %}
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">{{ q.sequence }}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">{{ q.correct_answer }}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">{{ q.cognitive_level }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>© 2025 EOG Practice Test Generator. Aligned with NCDPI Standards.</p>
+    </div>
+</body>
+</html>
