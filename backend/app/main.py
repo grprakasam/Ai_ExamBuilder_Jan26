@@ -27,7 +27,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to EOG Practice Test Generator API"}
+    return {"message": "Welcome to EduApp Exam Platform API"}
 
 @app.get("/health")
 async def health_check():

@@ -5,7 +5,7 @@ from app.api import deps
 from app.db.session import get_db
 from app.schemas.test import TestCreate, TestWithQuestions
 from app.services.question_generator import QuestionGenerator
-from app.models.test import Test, Question, QuestionTypeEnum
+from app.models.test import Test, Question, QuestionTypeEnum, ExamStandardEnum
 import uuid
 
 router = APIRouter()
@@ -41,6 +41,7 @@ async def generate_test(
             question_count=test_in.question_count,
             question_type=test_in.question_type,
             difficulty=test_in.difficulty,
+            exam_standard=test_in.exam_standard,
             # created_by=current_user.id  # Add after auth implementation
         )
         db.add(db_test)
@@ -117,21 +118,46 @@ async def submit_test(
         
     feedback_result = await engine.evaluate_responses(test_data, answers)
     
-    # Calculate simple score for MCQ if any
+    # Calculate score based on exam standard
     correct_count = 0
+    wrong_count = 0
     total_mcq = 0
-    for i, q in enumerate(db_test.questions):
-        if q.question_type == QuestionTypeEnum.MCQ:
-            total_mcq += 1
-            user_ans = answers.get(str(i))
-            if user_ans == q.correct_answer:
-                correct_count += 1
-                
-    mcq_score = (correct_count / total_mcq) * 100 if total_mcq > 0 else None
+    final_score = 0
+    
+    if db_test.exam_standard == ExamStandardEnum.NEET:
+        # NEET Scoring: +4 for correct, -1 for wrong, 0 for unattempted
+        for i, q in enumerate(db_test.questions):
+            if q.question_type == QuestionTypeEnum.MCQ:
+                total_mcq += 1
+                user_ans = answers.get(str(i))
+                if user_ans is not None:
+                    if user_ans == q.correct_answer:
+                        correct_count += 1
+                        final_score += 4
+                    else:
+                        wrong_count += 1
+                        final_score -= 1
+        
+        max_possible = total_mcq * 4
+        percentage_score = (final_score / max_possible) * 100 if max_possible > 0 else 0
+    else:
+        # Default simple scoring
+        for i, q in enumerate(db_test.questions):
+            if q.question_type == QuestionTypeEnum.MCQ:
+                total_mcq += 1
+                user_ans = answers.get(str(i))
+                if user_ans == q.correct_answer:
+                    correct_count += 1
+        
+        percentage_score = (correct_count / total_mcq) * 100 if total_mcq > 0 else 0
+        final_score = correct_count
     
     return {
-        "score": mcq_score,
+        "score": percentage_score,
+        "absolute_score": final_score,
         "correct_count": correct_count,
+        "wrong_count": wrong_count,
         "total_mcq": total_mcq,
+        "exam_standard": db_test.exam_standard,
         "ai_feedback": feedback_result
     }

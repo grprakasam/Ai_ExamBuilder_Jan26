@@ -3,12 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { BookOpen, Calendar, ChevronRight, Search, Plus } from 'lucide-react';
 import api from '../services/api';
 import { useProgressStore } from '../store/progressStore';
+import { useExamStore } from '../store/examStore';
+import ExamDashboard from '../components/ExamDashboard';
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const { subjectMastery, totalQuestionsSolved } = useProgressStore();
+    const { selectedExam, examName, examColor } = useExamStore();
     const [tests, setTests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+
+    if (selectedExam && examName && examColor) {
+        return <ExamDashboard examId={selectedExam} examName={examName} examColor={examColor} />;
+    }
+
 
     useEffect(() => {
         const fetchRecentTests = async () => {

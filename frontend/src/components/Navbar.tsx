@@ -25,7 +25,7 @@ const Navbar: React.FC = () => {
                         </div>
                         <div className="hidden sm:block">
                             <span className="text-lg font-bold text-slate-900">
-                                EOG Prep
+                                EduApp
                             </span>
                         </div>
                     </div>
