@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from app.api import deps
+from app.models.exam_attempt import ExamAttempt
+from app.services.scoring import score_questions
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -13,6 +16,7 @@ router = APIRouter()
 @router.get("/{test_id}/download")
 async def download_test_pdf(
     test_id: uuid.UUID,
+    access=Depends(deps.require_test_access),
     db: Session = Depends(get_db)
 ):
     # 1. Fetch test and questions
@@ -56,14 +60,20 @@ async def download_test_pdf(
 @router.get("/{test_id}/results/download")
 async def download_results_pdf(
     test_id: uuid.UUID,
-    score: float,
-    feedback: str,
+    attempt_id: uuid.UUID,
+    request: Request,
+    access=Depends(deps.require_test_access),
     db: Session = Depends(get_db)
 ):
     db_test = db.query(Test).filter(Test.id == test_id).first()
     if not db_test:
         raise HTTPException(status_code=404, detail="Test not found")
     
+    attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id, ExamAttempt.test_id == test_id).first()
+    if not attempt or attempt.session_hash != deps.session_hash(request) or not attempt.is_completed:
+        raise HTTPException(403, "Completed attempt for this session required")
+    score = score_questions(db_test.questions, attempt.answers or {}, db_test.exam_standard)["score"]
+    feedback = "MCQ score computed by the server. Written answers require educator review."
     test_dict = {
         "title": db_test.title,
         "grade_level": db_test.grade_level,
@@ -83,7 +93,7 @@ async def download_results_pdf(
     
     pdf_service = PDFService()
     temp_dir = tempfile.gettempdir()
-    file_path = os.path.join(temp_dir, f"Results_{test_id}.pdf")
+    file_path = os.path.join(temp_dir, f"Results_{test_id}_{attempt_id}.pdf")
     
     try:
         pdf_service.generate_test_pdf(test_dict, questions_list, file_path, template_name="results_template.html")

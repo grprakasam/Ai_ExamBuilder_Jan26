@@ -7,6 +7,11 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+    const testId = config.url?.match(/[0-9a-f]{8}-[0-9a-f-]{27}/i)?.[0];
+    if (testId) {
+        const code = sessionStorage.getItem('exam-access:' + testId);
+        if (code) config.headers['X-Access-Code'] = code;
+    }
     // Rely on Zustand's persist key in localStorage
     const authStorage = localStorage.getItem('auth-storage');
     if (authStorage) {

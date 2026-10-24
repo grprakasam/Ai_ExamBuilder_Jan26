@@ -9,6 +9,7 @@ const Navbar: React.FC = () => {
     const navItems = [
         { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { to: '/create', icon: FilePlus, label: 'Create' },
+        { to: '/learning', icon: GraduationCap, label: 'Learning' },
     ];
 
     return (

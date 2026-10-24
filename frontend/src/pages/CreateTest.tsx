@@ -44,6 +44,7 @@ const testSchema = z.object({
     question_count: z.string(),
     question_type: z.string(),
     difficulty: z.string(),
+    practice_mode: z.boolean().default(false),
 });
 
 const CreateTest: React.FC = () => {
@@ -74,9 +75,16 @@ const CreateTest: React.FC = () => {
 
     useEffect(() => {
         const standards = getStandardsForSelection(watchSubject, watchGradeLevel);
+        api.get('/tests/exam-profiles').then(({ data }) => {
+            const topics = data[selectedExam || 'ncdpi']?.topics;
+            if (selectedExam !== 'ncdpi' && topics?.length) {
+                setAvailableStandards(topics);
+                setValue('standard_focus', topics[0]);
+            }
+        }).catch(() => undefined);
         setAvailableStandards(standards);
         setValue('standard_focus', standards[0] || '');
-    }, [watchSubject, watchGradeLevel, setValue]);
+    }, [watchSubject, watchGradeLevel, setValue, selectedExam]);
 
     const onSubmit = async (data: any) => {
         setLoading(true);
@@ -88,6 +96,7 @@ const CreateTest: React.FC = () => {
                 exam_standard: selectedExam || 'ncdpi'
             };
             const response = await api.post('/tests/generate', apiData);
+            sessionStorage.setItem('exam-access:' + response.data.id, response.data.access_code);
             setGeneratedTest(response.data);
             setStep(3);
         } catch (error) {
@@ -156,7 +165,7 @@ const CreateTest: React.FC = () => {
                                     </div>
                                     <div>
                                         <p className="font-black text-slate-900 text-lg">{subj.label}</p>
-                                        <p className="text-sm text-slate-400 font-medium">Standard NC Curriculum</p>
+                                        <p className="text-sm text-slate-400 font-medium">Practice curriculum</p>
                                     </div>
                                 </button>
                             ))}
@@ -263,7 +272,7 @@ const CreateTest: React.FC = () => {
                                             <div>
                                                 <p className="font-black text-slate-900 text-sm tracking-tight">{watchAll.practice_mode ? 'Learning Practice' : 'Standardized Exam'}</p>
                                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                                                    {watchAll.practice_mode ? 'Real-time Clinical Insights' : 'Formal Performance Metrics'}
+                                                    {watchAll.practice_mode ? 'Adaptive Practice' : 'Formal Performance Metrics'}
                                                 </p>
                                             </div>
                                         </div>
@@ -306,9 +315,10 @@ const CreateTest: React.FC = () => {
                             <p className="text-slate-400">{generatedTest.question_count} questions generated successfully!</p>
                         </div>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <p className="font-bold">Access code: {generatedTest.access_code}</p>
                             <button
                                 type="button"
-                                onClick={() => navigate(`/take/${generatedTest.id}`)}
+                                onClick={() => navigate(`/take/${generatedTest.id}`, { state: { practiceMode: watchAll.practice_mode } })}
                                 className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 hover:scale-105 transition-transform"
                             >
                                 <Brain className="w-5 h-5" />

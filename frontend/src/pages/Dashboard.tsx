@@ -8,7 +8,7 @@ import ExamDashboard from '../components/ExamDashboard';
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { subjectMastery, totalQuestionsSolved } = useProgressStore();
+    const { totalQuestionsSolved } = useProgressStore();
     const { selectedExam, examName, examColor } = useExamStore();
     const [tests, setTests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);

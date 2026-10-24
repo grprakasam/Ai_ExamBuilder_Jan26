@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Layout from './components/Layout'
 import CreateTest from './pages/CreateTest'
 import Dashboard from './pages/Dashboard'
+import Learning from './pages/Learning'
 import TakeTest from './pages/TakeTest'
 import Results from './pages/Results'
 import ExamSelector from './components/ExamSelector'
@@ -40,6 +41,7 @@ function App() {
             element={!selectedExam ? <ExamSelector onSelectExam={handleSelectExam} /> : <Navigate to="/dashboard" replace />}
           />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/learning" element={<Learning />} />
           <Route path="/create" element={<CreateTest />} />
           <Route path="/take/:testId" element={<TakeTest />} />
           <Route path="/results/:testId" element={<Results />} />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Target, Flame, BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Target, Flame, BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface ConceptMastery {
     concept_id: string;
@@ -25,13 +25,6 @@ const MasteryDashboard: React.FC<MasteryDashboardProps> = ({
     bestStreak,
     conceptsDueReview,
 }) => {
-    const getMasteryColor = (level: number) => {
-        if (level >= 0.8) return 'bg-green-500';
-        if (level >= 0.6) return 'bg-blue-500';
-        if (level >= 0.4) return 'bg-yellow-500';
-        return 'bg-orange-500';
-    };
-
     const getMasteryLabel = (level: number) => {
         if (level >= 0.8) return 'Mastered';
         if (level >= 0.6) return 'Proficient';

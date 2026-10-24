@@ -1,4 +1,5 @@
 from typing import List, Dict, Optional
+from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models.concept import MasteryRecord
 from app.models.test import Question, DifficultyEnum
@@ -27,7 +28,8 @@ class AdaptiveDifficultyService:
         db: Session,
         test_id: uuid.UUID,
         concept_id: str,
-        recent_questions: int = 5
+        recent_questions: int = 5,
+        learner_key: str = "legacy"
     ) -> float:
         """
         Calculate the current appropriate difficulty level (0.0-1.0) for a student.
@@ -43,6 +45,7 @@ class AdaptiveDifficultyService:
         """
         mastery_record = db.query(MasteryRecord).filter(
             MasteryRecord.test_id == test_id,
+            MasteryRecord.learner_key == learner_key,
             MasteryRecord.concept_id == concept_id
         ).first()
         
@@ -77,7 +80,7 @@ class AdaptiveDifficultyService:
         Returns:
             'increase', 'decrease', or None
         """
-        if len(recent_results) < 3:
+        if len(recent_results) < 2:
             return None
         
         # Check for consecutive correct answers
@@ -131,7 +134,8 @@ class PersonalizedPracticeQueue:
         db: Session,
         test_id: uuid.UUID,
         target_questions: int = 20,
-        mix_ratio: float = 0.7  # 70% weak concepts, 30% review
+        mix_ratio: float = 0.7,
+        learner_key: str = "legacy"
     ) -> List[Dict]:
         """
         Generate a personalized practice session.
@@ -153,7 +157,8 @@ class PersonalizedPracticeQueue:
         """
         # Get all mastery records for this student
         records = db.query(MasteryRecord).filter(
-            MasteryRecord.test_id == test_id
+            MasteryRecord.test_id == test_id,
+            MasteryRecord.learner_key == learner_key
         ).all()
         
         if not records:
@@ -165,7 +170,7 @@ class PersonalizedPracticeQueue:
         
         # Categorize concepts
         weak_concepts = [r for r in records if r.current_level < 0.8 and not r.is_mastered]
-        review_concepts = [r for r in records if r.needs_review]
+        review_concepts = [r for r in records if r.next_review_due and r.next_review_due <= datetime.now()]
         mastered_concepts = [r for r in records if r.is_mastered]
         
         # Calculate question distribution
@@ -177,7 +182,7 @@ class PersonalizedPracticeQueue:
         # Add weak concept questions
         for i, record in enumerate(weak_concepts[:weak_count]):
             difficulty = AdaptiveDifficultyService.calculate_current_difficulty(
-                db, test_id, record.concept_id
+                db, test_id, record.concept_id, learner_key=learner_key
             )
             practice_queue.append({
                 "concept_id": record.concept_id,
@@ -190,7 +195,7 @@ class PersonalizedPracticeQueue:
         # Add review questions
         for i, record in enumerate(review_concepts[:review_count]):
             difficulty = AdaptiveDifficultyService.calculate_current_difficulty(
-                db, test_id, record.concept_id
+                db, test_id, record.concept_id, learner_key=learner_key
             )
             practice_queue.append({
                 "concept_id": record.concept_id,
@@ -218,7 +223,8 @@ class PersonalizedPracticeQueue:
     def get_next_question_recommendation(
         db: Session,
         test_id: uuid.UUID,
-        recent_performance: List[Dict]
+        recent_performance: List[Dict],
+        learner_key: str = "legacy"
     ) -> Dict:
         """
         Get real-time recommendation for next question.
@@ -261,7 +267,7 @@ class PersonalizedPracticeQueue:
         
         # Move to next concept in queue
         practice_queue = PersonalizedPracticeQueue.generate_practice_session(
-            db, test_id, target_questions=1
+            db, test_id, target_questions=1, learner_key=learner_key
         )
         
         return practice_queue[0] if practice_queue else {

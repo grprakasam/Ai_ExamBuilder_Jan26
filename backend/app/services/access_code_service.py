@@ -99,6 +99,14 @@ class AccessCodeService:
         Returns:
             ExamAttempt object or None if validation fails
         """
+        from app.api.deps import authorize_test
+        authorize_test(db, test_id, access_code)
+        active = db.query(ExamAttempt).filter(
+            ExamAttempt.test_id == test_id, ExamAttempt.session_hash == session_hash,
+            ExamAttempt.is_completed.is_(False)
+        ).first()
+        if active:
+            return active
         # Validate access
         is_valid, error = AccessCodeService.validate_access_code(
             db, test_id, access_code, session_hash

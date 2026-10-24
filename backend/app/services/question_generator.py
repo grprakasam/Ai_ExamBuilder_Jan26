@@ -9,16 +9,21 @@ class QuestionGenerator:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.OPENAI_MODEL
 
-    def _build_prompt(self, grade: int, subject: str, standard: str, count: int, q_type: str, difficulty: str) -> str:
+    def _build_prompt(self, grade: int, subject: str, standard: str, count: int, q_type: str, difficulty: str, exam_standard: str = "ncdpi") -> str:
         type_instruction = ""
         if q_type == "open_ended":
             type_instruction = "These should be open-ended, short-answer questions. Do NOT provide options A, B, C, D. Instead, provide a 'correct_answer' which is a model response or rubric."
+        elif q_type == "mixed":
+            type_instruction = "Include both MCQ and open-ended questions. Each item must declare its actual type."
         else:
             type_instruction = "These must be Multiple Choice Questions (MCQ). Provide exactly 4 choices labeled A, B, C, D. Each wrong answer should be designed to reveal a specific misconception."
 
+        from app.services.exam_profiles import profile_prompt
+        exam_context = profile_prompt(exam_standard)
         return f"""
 You are a learning-centered assessment designer creating questions that TEACH, not just test.
 
+{exam_context}
 Create {count} questions for:
 • Grade: {grade}
 • Subject: {subject}
@@ -54,13 +59,13 @@ For EACH question, provide COMPLETE learning support:
 - worked_example: Step-by-step solution showing the thinking process
 - hint: A guiding question or reminder that helps without giving away the answer
 
-Output ONLY valid JSON in this exact format:
+For mixed requests, each question_type must be mcq or open_ended, never mixed.\nFor open_ended questions, use null options and a model written answer.\nOutput ONLY valid JSON in this exact format:
 {{
   "questions": [
     {{
       "sequence": 1,
       "question_text": "What is 3/4 + 1/2?",
-      "question_type": "{q_type}",
+      "question_type": "mcq",
       "options": {{"A": "5/4", "B": "4/6", "C": "1/3", "D": "2/3"}},
       "correct_answer": "A",
       
@@ -87,8 +92,8 @@ Output ONLY valid JSON in this exact format:
 }}
 """
 
-    async def generate_questions(self, grade: int, subject: str, standard: str, count: int, q_type: str, difficulty: str) -> List[Dict[str, Any]]:
-        prompt = self._build_prompt(grade, subject, standard, count, q_type, difficulty)
+    async def generate_questions(self, grade: int, subject: str, standard: str, count: int, q_type: str, difficulty: str, exam_standard: str = "ncdpi") -> List[Dict[str, Any]]:
+        prompt = self._build_prompt(grade, subject, standard, count, q_type, difficulty, exam_standard)
 
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -99,6 +104,7 @@ Output ONLY valid JSON in this exact format:
                 },
                 {"role": "user", "content": prompt}
             ],
+            response_format={"type": "json_object"},
             temperature=0.7
         )
 
@@ -111,4 +117,8 @@ Output ONLY valid JSON in this exact format:
             content = content.split("```")[1].split("```")[0].strip()
 
         data = json.loads(content)
-        return data.get("questions", [])
+        from app.schemas.generated import GeneratedQuestions
+        result = GeneratedQuestions.model_validate(data)
+        if len(result.questions) != count:
+            raise ValueError("Generated question count does not match request")
+        return [q.model_dump() for q in result.questions]
