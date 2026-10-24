@@ -1,4 +1,3 @@
-from xhtml2pdf import pisa
 from jinja2 import Environment, FileSystemLoader
 from typing import List, Dict, Any
 import os
@@ -18,6 +17,7 @@ class PDFService:
         html_content = template.render(test=test_data, questions=questions)
         
         # 3. Convert HTML to PDF using xhtml2pdf
+        from xhtml2pdf import pisa
         with open(output_path, "wb") as output_file:
             pisa_status = pisa.CreatePDF(
                 html_content,

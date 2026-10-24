@@ -110,7 +110,9 @@ class MasteryService:
         concept_id: str,
         is_correct: bool,
         time_taken_seconds: float,
-        had_hint: bool = False
+        had_hint: bool = False,
+        learner_key: str = "legacy",
+        commit: bool = True
     ) -> MasteryRecord:
         """
         Update or create a mastery record for a concept.
@@ -129,6 +131,7 @@ class MasteryService:
         # Get or create mastery record
         record = db.query(MasteryRecord).filter(
             MasteryRecord.test_id == test_id,
+            MasteryRecord.learner_key == learner_key,
             MasteryRecord.concept_id == concept_id
         ).first()
         
@@ -136,10 +139,12 @@ class MasteryService:
             record = MasteryRecord(
                 test_id=test_id,
                 concept_id=concept_id,
+                learner_key=learner_key,
                 last_practiced=datetime.now(),
                 next_review_due=datetime.now() + timedelta(days=1)
             )
             db.add(record)
+            db.flush()
         
         # Update attempt counts
         record.questions_attempted += 1
@@ -192,8 +197,11 @@ class MasteryService:
             # Exponential moving average
             record.avg_time_to_correct = 0.7 * record.avg_time_to_correct + 0.3 * time_taken_seconds
         
-        db.commit()
-        db.refresh(record)
+        if commit:
+            db.commit()
+            db.refresh(record)
+        else:
+            db.flush()
         
         return record
     
@@ -201,23 +209,27 @@ class MasteryService:
     def get_concepts_due_for_review(
         db: Session,
         test_id: uuid.UUID,
-        limit: int = 10
+        limit: int = 10,
+        learner_key: str = "legacy"
     ) -> List[MasteryRecord]:
         """Get concepts that are due for review."""
         now = datetime.now()
         return db.query(MasteryRecord).filter(
             MasteryRecord.test_id == test_id,
+            MasteryRecord.learner_key == learner_key,
             MasteryRecord.next_review_due <= now
         ).order_by(MasteryRecord.next_review_due).limit(limit).all()
     
     @staticmethod
     def get_mastery_summary(
         db: Session,
-        test_id: uuid.UUID
+        test_id: uuid.UUID,
+        learner_key: str = "legacy"
     ) -> Dict:
         """Get overall mastery summary for a student."""
         records = db.query(MasteryRecord).filter(
-            MasteryRecord.test_id == test_id
+            MasteryRecord.test_id == test_id,
+            MasteryRecord.learner_key == learner_key
         ).all()
         
         if not records:

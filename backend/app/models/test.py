@@ -107,7 +107,7 @@ class Test(Base):
     shuffle_questions = Column(Boolean, default=False)
     shuffle_options = Column(Boolean, default=False)
     
-    questions = relationship("Question", back_populates="test", cascade="all, delete-orphan")
+    questions = relationship("Question", back_populates="test", cascade="all, delete-orphan", order_by="Question.sequence")
 
 class Question(Base):
     id = Column(UUID, primary_key=True, default=uuid.uuid4)

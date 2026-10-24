@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { LearningMode, LearningSessionState } from '../types';
+import type { LearningMode, LearningSessionState } from '../types';
 
 interface LearningStore extends LearningSessionState {
     // Actions

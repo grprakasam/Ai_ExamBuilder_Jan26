@@ -79,6 +79,8 @@ class MasteryRecord(Base):
     test_id = Column(UUID, ForeignKey("test.id"))
     concept_id = Column(String, ForeignKey("concept.concept_id"), nullable=False)
     
+    learner_key = Column(String, nullable=False, default="legacy", index=True)
+
     # Mastery Metrics
     current_level = Column(Float, default=0.0)  # 0.0 to 1.0 (0-100%)
     questions_attempted = Column(Integer, default=0)

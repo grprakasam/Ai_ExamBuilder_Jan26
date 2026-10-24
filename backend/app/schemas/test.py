@@ -42,7 +42,7 @@ class TestBase(BaseModel):
     question_count: int = Field(..., ge=1, le=50)
     question_type: QuestionTypeEnum
     difficulty: DifficultyEnum
-    exam_standard: Optional[ExamStandardEnum] = ExamStandardEnum.NCDPI
+    exam_standard: ExamStandardEnum = ExamStandardEnum.NCDPI
 
 class TestCreate(TestBase):
     pass
@@ -56,3 +56,4 @@ class TestResponse(TestBase):
 
 class TestWithQuestions(TestResponse):
     questions: List[QuestionBase]
+    access_code: Optional[str] = None

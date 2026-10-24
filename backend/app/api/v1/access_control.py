@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.db.session import get_db
+from app.api import deps
 from app.services.access_code_service import AccessCodeService
 from app.models.test import Test
 from app.models.exam_attempt import ExamAttempt, AttemptRequest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 import uuid
 
@@ -26,14 +27,13 @@ class StartAttemptRequest(BaseModel):
 class CompleteAttemptRequest(BaseModel):
     attempt_id: str
     answers: dict
-    score: float
     time_taken_seconds: int
 
 
 class RequestAttemptsRequest(BaseModel):
     test_id: str
     access_code: str
-    requested_attempts: int
+    requested_attempts: int = Field(ge=1, le=20)
     reason: Optional[str] = None
 
 
@@ -81,6 +81,10 @@ async def validate_access_code(
             "attempts_remaining": summary["attempts_remaining"],
             "best_score": summary["best_score"]
         }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -109,10 +113,13 @@ async def start_exam_attempt(
         return {
             "attempt_id": str(attempt.id),
             "attempt_number": attempt.attempt_number,
+            "answers": attempt.answers or {},
             "started_at": attempt.started_at.isoformat()
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -123,37 +130,7 @@ async def complete_exam_attempt(
     db: Session = Depends(get_db)
 ):
     """Complete an exam attempt with results."""
-    try:
-        attempt_id = uuid.UUID(req.attempt_id)
-        
-        # Get test to check passing score
-        attempt = db.query(ExamAttempt).filter(ExamAttempt.id == attempt_id).first()
-        if not attempt:
-            raise HTTPException(status_code=404, detail="Attempt not found")
-        
-        test = db.query(Test).filter(Test.id == attempt.test_id).first()
-        passing_score = test.passing_score if test else 0.6
-        
-        completed_attempt = AccessCodeService.complete_exam_attempt(
-            db=db,
-            attempt_id=attempt_id,
-            answers=req.answers,
-            score=req.score,
-            time_taken_seconds=req.time_taken_seconds,
-            passing_score=passing_score
-        )
-        
-        return {
-            "attempt_id": str(completed_attempt.id),
-            "score": completed_attempt.score,
-            "is_passed": completed_attempt.is_passed,
-            "time_taken_seconds": completed_attempt.time_taken_seconds,
-            "completed_at": completed_attempt.completed_at.isoformat() if completed_attempt.completed_at else None
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=410, detail="Submit to /tests/{test_id}/submit; client scores are not accepted")
 
 
 @router.get("/attempt-summary/{test_id}")
@@ -170,6 +147,10 @@ async def get_attempt_summary(
         summary = AccessCodeService.get_attempt_summary(db, test_uuid, session_hash)
         
         return summary
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -184,6 +165,7 @@ async def request_additional_attempts(
     try:
         test_id = uuid.UUID(req.test_id)
         session_hash = get_session_hash(request)
+        deps.authorize_test(db, test_id, req.access_code)
         
         attempt_request = AccessCodeService.request_additional_attempts(
             db=db,
@@ -201,13 +183,17 @@ async def request_additional_attempts(
             "requested_attempts": attempt_request.requested_attempts,
             "message": "Request submitted for admin review"
         }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ===== ADMIN ENDPOINTS =====
 
-@router.get("/admin/pending-requests")
+@router.get("/admin/pending-requests", dependencies=[Depends(deps.get_admin)])
 async def get_pending_requests(
     db: Session = Depends(get_db)
 ):
@@ -231,11 +217,15 @@ async def get_pending_requests(
                 for r in requests
             ]
         }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/admin/approve-request/{request_id}")
+@router.post("/admin/approve-request/{request_id}", dependencies=[Depends(deps.get_admin)])
 async def approve_attempt_request(
     request_id: str,
     admin_notes: Optional[str] = None,
@@ -267,5 +257,7 @@ async def approve_attempt_request(
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
