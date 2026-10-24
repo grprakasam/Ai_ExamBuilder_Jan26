@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle2, XCircle, Lightbulb, BookOpen, AlertCircle } from 'lucide-react';
-import { Question } from '../types';
+import type { Question } from '../types';
 
 interface QuestionFeedbackProps {
     question: Question;

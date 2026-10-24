@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     # List of allowed origins, e.g., ["http://localhost:5173", "https://app.eduapp.com"]
     ALLOWED_ORIGINS: List[str] = ["*"]
     
+    ADMIN_EMAILS: List[str] = []
+
     # OpenAI
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-3.5-turbo"

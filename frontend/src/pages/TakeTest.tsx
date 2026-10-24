@@ -9,6 +9,12 @@ const TakeTest: React.FC = () => {
     const location = useLocation();
     const practiceMode = location.state?.practiceMode || false;
 
+    const [accessCode, setAccessCode] = useState(sessionStorage.getItem('exam-access:' + testId) || '');
+    const [enteredCode, setEnteredCode] = useState('');
+    const [attemptId, setAttemptId] = useState('');
+    const [nextAdaptiveIndex, setNextAdaptiveIndex] = useState<number | null>(null);
+    const [answerError, setAnswerError] = useState('');
+    const [started] = useState(Date.now());
     const [test, setTest] = useState<any>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -20,17 +26,27 @@ const TakeTest: React.FC = () => {
 
     useEffect(() => {
         const fetchTest = async () => {
+            if (!accessCode) { setLoading(false); return; }
+            setLoading(true);
             try {
+                sessionStorage.setItem('exam-access:' + testId, accessCode);
                 const response = await api.get(`/tests/${testId}`);
+                const attempt = await api.post('/access/start-attempt', { test_id: testId, access_code: accessCode });
+                setAttemptId(attempt.data.attempt_id);
+                setAnswers(attempt.data.answers || {});
+                const remaining = response.data.questions.findIndex((_: unknown, i: number) => !(String(i) in (attempt.data.answers || {})));
+                setCurrentQuestionIndex(remaining >= 0 ? remaining : response.data.questions.length - 1);
+                setIsAnswered(remaining < 0 && practiceMode);
+                sessionStorage.setItem('exam-attempt:' + testId, attempt.data.attempt_id);
                 setTest(response.data);
             } catch (error) {
-                console.error("Failed to fetch test", error);
+                setAnswerError("Check your access code and remaining attempts.");
             } finally {
                 setLoading(false);
             }
         };
         fetchTest();
-    }, [testId]);
+    }, [testId, accessCode]);
 
     useEffect(() => {
         if (timeLeft <= 0 || practiceMode) return;
@@ -40,7 +56,7 @@ const TakeTest: React.FC = () => {
         return () => clearInterval(timer);
     }, [timeLeft, practiceMode]);
 
-    const handleAnswerChange = (value: string) => {
+    const handleAnswerChange = async (value: string) => {
         if (isAnswered && practiceMode) return;
 
         setAnswers({
@@ -49,12 +65,21 @@ const TakeTest: React.FC = () => {
         });
 
         if (practiceMode) {
-            setIsAnswered(true);
+            try {
+                setSubmitting(true);
+                const { data } = await api.post('/tests/' + testId + '/practice-answer', {
+                    attempt_id: attemptId, question_index: currentQuestionIndex, answer: value,
+                    time_taken_seconds: (Date.now() - started) / 1000, had_hint: showHint
+                });
+                setNextAdaptiveIndex(data.next_question_index);
+                setIsAnswered(true); setAnswerError('');
+            } catch { setAnswerError('Could not record this answer. Please retry.'); }
+            finally { setSubmitting(false); }
         }
     };
 
     const nextQuestion = () => {
-        setCurrentQuestionIndex(prev => prev + 1);
+        setCurrentQuestionIndex(prev => practiceMode ? (nextAdaptiveIndex ?? prev) : prev + 1);
         setIsAnswered(false);
         setShowHint(false);
     };
@@ -62,16 +87,18 @@ const TakeTest: React.FC = () => {
     const handleSubmit = async () => {
         setSubmitting(true);
         try {
-            const response = await api.post(`/tests/${testId}/submit`, answers);
+            const response = await api.post(`/tests/${testId}/submit`, { attempt_id: attemptId, answers, time_taken_seconds: Math.round((Date.now() - started) / 1000) });
             navigate(`/results/${testId}`, {
                 state: {
                     answers,
+                    score: response.data.score,
+                    attemptId,
                     ai_feedback: response.data.ai_feedback,
                     practiceMode
                 }
             });
         } catch (error) {
-            console.error("Submission failed", error);
+            setAnswerError("Submission failed. Your answers remain here; please retry.");
         } finally {
             setSubmitting(false);
         }
@@ -83,11 +110,16 @@ const TakeTest: React.FC = () => {
         </div>
     );
 
-    if (!test) return <div>Test not found</div>;
+    if (!test) return <section className="max-w-md mx-auto space-y-4">
+        <h1 className="text-xl font-bold">Enter test access code</h1>
+        <p>{answerError || 'Use the access code shared with this test.'}</p>
+        <input aria-label="Access code" className="border p-3" value={enteredCode} onChange={e => setEnteredCode(e.target.value)} />
+        <button className="bg-indigo-600 text-white p-3" onClick={() => setAccessCode(enteredCode)}>Open test</button>
+    </section>;
 
     const questions = test.questions || [];
     const currentQuestion = questions[currentQuestionIndex];
-    const isLastQuestion = currentQuestionIndex === questions.length - 1;
+    const isLastQuestion = practiceMode ? Object.keys(answers).length >= questions.length && isAnswered : currentQuestionIndex === questions.length - 1;
     const isMCQ = currentQuestion.question_type === 'mcq' || !!currentQuestion.options;
     const userAnswer = answers[currentQuestionIndex];
     const isCorrect = userAnswer === currentQuestion.correct_answer;
@@ -146,7 +178,7 @@ const TakeTest: React.FC = () => {
                             <Lightbulb className="w-4 h-4 text-amber-600" />
                             <span className="text-xs font-black text-amber-700 uppercase">Hint</span>
                         </div>
-                        <p className="text-sm text-slate-700 font-medium italic leading-relaxed">Consider how this relates to the core concepts of {test.subject}.</p>
+                        <p className="text-sm text-slate-700 font-medium italic leading-relaxed">{currentQuestion.hint || 'Consider the relevant concepts and show each step.'}</p>
                     </div>
                 )}
 
@@ -156,7 +188,7 @@ const TakeTest: React.FC = () => {
                             <button
                                 key={key}
                                 onClick={() => handleAnswerChange(key)}
-                                disabled={isAnswered && practiceMode}
+                                disabled={submitting || (isAnswered && practiceMode)}
                                 className={`flex items-start gap-5 p-6 rounded-2xl border-2 transition-all text-left group ${userAnswer === key
                                     ? (practiceMode ? (isCorrect ? 'border-emerald-500 bg-emerald-50' : 'border-rose-500 bg-rose-50') : 'border-indigo-600 bg-indigo-50 shadow-md')
                                     : 'border-slate-50 bg-slate-50 hover:border-slate-200 hover:bg-white'
@@ -184,13 +216,16 @@ const TakeTest: React.FC = () => {
                 ) : (
                     <textarea
                         value={userAnswer || ''}
-                        onChange={(e) => handleAnswerChange(e.target.value)}
+                        onChange={(e) => setAnswers({ ...answers, [currentQuestionIndex]: e.target.value })}
                         placeholder="Type your detailed response here..."
                         className="w-full bg-slate-50 border-2 border-slate-100 rounded-3xl p-8 h-48 outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-600 transition-all font-medium text-lg text-slate-900 placeholder-slate-400"
                     />
                 )}
 
-                {practiceMode && isAnswered && (
+                {practiceMode && !isMCQ && !isAnswered && <button disabled={submitting || !userAnswer}
+                    onClick={() => handleAnswerChange(userAnswer)}>Record written answer for review</button>}
+                {practiceMode && !isMCQ && isAnswered && <p>Written answer recorded. Educator review is required.</p>}
+                {practiceMode && isMCQ && isAnswered && (
                     <div className={`p-8 rounded-3xl border-2 animate-in slide-in-from-top duration-500 ${isCorrect ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
                         <div className="flex items-center gap-3 mb-3">
                             <MessageSquare className={`w-5 h-5 ${isCorrect ? 'text-emerald-600' : 'text-rose-600'}`} />
@@ -208,11 +243,12 @@ const TakeTest: React.FC = () => {
                 )}
             </div>
 
+            {answerError && <p role="alert">{answerError}</p>}
             {/* Navigation Controls */}
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
                 <button
                     onClick={() => setCurrentQuestionIndex(p => p - 1)}
-                    disabled={currentQuestionIndex === 0}
+                    disabled={practiceMode || currentQuestionIndex === 0}
                     className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 font-bold flex items-center justify-center gap-2 transition-all"
                 >
                     <ChevronLeft className="w-5 h-5" /> Previous
@@ -230,7 +266,7 @@ const TakeTest: React.FC = () => {
                 ) : (
                     <button
                         onClick={nextQuestion}
-                        disabled={!userAnswer}
+                        disabled={!userAnswer || submitting || (practiceMode && !isAnswered)}
                         className="w-full sm:w-auto px-12 py-4 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 font-black shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 text-lg"
                     >
                         Next Question <ChevronRight className="w-5 h-5" />

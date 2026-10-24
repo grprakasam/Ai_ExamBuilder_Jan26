@@ -1,6 +1,6 @@
 import React from 'react';
 import { GraduationCap, Dumbbell, ClipboardCheck } from 'lucide-react';
-import { LearningMode } from '../types';
+import type { LearningMode } from '../types';
 
 interface LearningModeSelectorProps {
     selectedMode: LearningMode;

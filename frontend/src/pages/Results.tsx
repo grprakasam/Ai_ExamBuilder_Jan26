@@ -8,7 +8,7 @@ const Results: React.FC = () => {
     const { testId } = useParams<{ testId: string }>();
     const location = useLocation();
     const navigate = useNavigate();
-    const userAnswers = location.state?.answers || {};
+    const [userAnswers, setUserAnswers] = useState<Record<number, string>>(location.state?.answers || {});
     const aiFeedback = location.state?.ai_feedback || null;
     const practiceMode = location.state?.practiceMode || false;
     const updateProgress = useProgressStore(state => state.updateProgress);
@@ -31,37 +31,30 @@ const Results: React.FC = () => {
         fetchTest();
     }, [testId]);
 
+    const attemptId = location.state?.attemptId || sessionStorage.getItem('exam-attempt:' + testId);
+    const [serverScore, setServerScore] = useState<number | null>(location.state?.score ?? null);
+    useEffect(() => {
+        if (attemptId) api.get('/tests/' + testId + '/results/' + attemptId)
+            .then(({ data }) => { setServerScore(data.score); setUserAnswers(data.answers); }).catch(() => setServerScore(null));
+    }, [testId, attemptId]);
     // Calculate Score
-    const getScore = () => {
-        if (!test) return 0;
-        const questions = test.questions || [];
-        if (aiFeedback?.evaluations) {
-            const sum = aiFeedback.evaluations.reduce((acc: number, curr: any) => acc + (curr.score || 0), 0);
-            return Math.round((sum / questions.length) * 100);
-        } else {
-            let correct = 0;
-            questions.forEach((q: any, index: number) => {
-                if (userAnswers[index] === q.correct_answer) correct++;
-            });
-            return Math.round((correct / questions.length) * 100);
-        }
-    };
+    const getScore = () => serverScore ?? 0;
 
     const totalScore = getScore();
 
     useEffect(() => {
-        if (test && !loading) {
+        if (test && !loading && serverScore !== null && !sessionStorage.getItem('exam-progress:' + attemptId)) {
+            sessionStorage.setItem('exam-progress:' + attemptId, '1');
             updateProgress(test.subject, totalScore, test.questions?.length || 0);
         }
-    }, [test, loading]);
+    }, [test, loading, serverScore, attemptId]);
 
     const handleDownload = async () => {
         setDownloading(true);
         try {
             const response = await api.get(`/reports/${testId}/results/download`, {
                 params: {
-                    score: totalScore,
-                    feedback: aiFeedback?.overall_summary || "Good effort!"
+                    attempt_id: attemptId
                 },
                 responseType: 'blob'
             });
@@ -176,7 +169,7 @@ const Results: React.FC = () => {
                 <div className="space-y-8">
                     {questions.map((q: any, index: number) => {
                         const feedback = aiFeedback?.evaluations?.find((e: any) => e.index === index + 1);
-                        const isCorrect = feedback ? feedback.score >= 0.8 : userAnswers[index] === q.correct_answer;
+                        const isCorrect = q.question_type === "mcq" ? userAnswers[index] === q.correct_answer : Boolean(feedback && feedback.score >= 0.8);
                         const isMCQ = q.question_type === 'mcq' || !!q.options;
 
                         return (
