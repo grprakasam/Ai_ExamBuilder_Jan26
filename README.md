@@ -1,5 +1,7 @@
 # AI Exam Builder
 
+[![Application checks](https://github.com/grprakasam/Ai_ExamBuilder_Jan26/actions/workflows/ci.yml/badge.svg)](https://github.com/grprakasam/Ai_ExamBuilder_Jan26/actions/workflows/ci.yml)
+
 **AI-generated, standards-aligned practice exams with adaptive difficulty, spaced-repetition mastery tracking and AI feedback.**
 
 A full-stack assessment platform: an LLM writes the questions and the feedback, while deterministic code does the scoring, difficulty adjustment, mastery tracking and access control. The model never decides a score on its own for multiple-choice questions.
@@ -13,7 +15,7 @@ A full-stack assessment platform: an LLM writes the questions and the feedback, 
 | Capability | How it works |
 |---|---|
 | **Question generation** | `QuestionGenerator` prompts an OpenAI model with grade, subject, standard, count, type and difficulty. Each question carries concept tags, Bloom level, explanations for every option, common misconceptions, a worked example and a hint. The reply is parsed as JSON and stored. |
-| **Exam standards** | NC EOG (NCDPI), NEET, JEE, CBSE, ICSE, Tamil Nadu state board and SAT. NEET uses its own marking scheme (+4 / −1 / 0). |
+| **Exam standards** | Eight practice profiles: NC EOG (NCDPI), NEET, JEE, CBSE, ICSE, Tamil Nadu state board, SAT and ACT. NEET uses its own marking scheme (+4 / −1 / 0). Profiles are practice contexts, not official syllabus certification. |
 | **Scoring** | Multiple-choice scoring is deterministic code, not the model. |
 | **AI feedback** | `FeedbackEngine` asks the model for a per-question score, feedback and a suggestion, using JSON mode (`response_format=json_object`). |
 | **Adaptive difficulty** | `AdaptiveDifficultyService` keeps each student in a zone of proximal development (target success rate 70–85%). It adjusts after 3 correct or 2 wrong answers in a row. |
@@ -97,11 +99,22 @@ frontend/src/
   store/         Zustand stores (auth, exams, learning, progress)
 ```
 
+## Tests
+
+```bash
+cd backend && python -m pytest tests -q     # integration tests: isolated SQLite, mocked model calls
+cd frontend && npm run build                # production compile
+```
+
+CI runs both on every push. The tests cover app startup, access checks and attempt limits, validation of model output before saving, deterministic scoring during a feedback outage, attempt-replay prevention and learner-isolated mastery.
+
 ## Current limitations
 
-- Login is bypassed for demos: `api/deps.py` returns a demo student. Turn this off before any real deployment.
+- Learners are identified by test ID, access code and a lightweight IP/user-agent session hash. Shared networks can collide and changing clients can bypass per-session attempt limits, so this is not a secure high-stakes testing system.
+- Open-ended answers still need educator review; the displayed percentage covers multiple-choice questions only.
+- Adaptive practice is a heuristic prototype, not validated adaptive psychometrics.
 - CORS allows all origins by default (`ALLOWED_ORIGINS` in `.env`).
-- There's no automated test suite yet. Adding tests for the scoring, SM-2 and adaptive-difficulty rules is next.
+- Model quality, load and learning outcomes have not been measured. See [evidence and limits](docs/evidence-and-limits.md).
 
 ## Author
 
