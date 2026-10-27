@@ -10,6 +10,12 @@ A full-stack assessment platform: an LLM writes the questions and the feedback, 
 
 ---
 
+## Demo
+
+![AI Exam Builder: replay of a real API run](docs/demo/ai-exam-builder-demo.gif)
+
+A one-minute replay of a real run through the API on an in-memory database. A model reply with an invalid answer key is rejected before anything is saved (HTTP 502); a valid reply is saved with an access code; the NEET score is computed by code (+4/−1) while the feedback model is down; a repeated submission is refused (HTTP 409); and practice answers update SM-2 mastery. Model replies are fixed stand-ins and no API key was used. [MP4 version](docs/demo/ai-exam-builder-demo.mp4).
+
 ## What it does
 
 | Capability | How it works |
@@ -115,6 +121,10 @@ CI runs both on every push. The tests cover app startup, access checks and attem
 - Adaptive practice is a heuristic prototype, not validated adaptive psychometrics.
 - CORS allows all origins by default (`ALLOWED_ORIGINS` in `.env`).
 - Model quality, load and learning outcomes have not been measured. See [evidence and limits](docs/evidence-and-limits.md).
+
+## How this was built
+
+I started this project in January 2026 and reworked it in October 2026 to add access-controlled attempts, deterministic scoring and adaptive practice. I use AI coding assistants (Claude Code and Codex) as pair programmers: they draft code and tests; I set the design, review every change and decide what ships.
 
 ## Author
 
