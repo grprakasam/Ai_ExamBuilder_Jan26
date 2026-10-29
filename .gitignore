@@ -40,3 +40,6 @@ frontend.log
 *.tmp
 .cache/
 nul
+
+# Machine-specific Claude Code settings
+.claude/settings.local.json
